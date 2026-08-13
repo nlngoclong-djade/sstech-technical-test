@@ -24,7 +24,7 @@ dotnet test Partner_Integration_BFF.sln
 Example:
 
 ```text
-Passed! - Failed: 0, Passed: 14, Skipped: 0, Total: 14
+Passed! - Failed: 0, Passed: 15, Skipped: 0, Total: 15
 ```
 
 To show every test's short scenario-and-reason description followed by the summary, enable the normal console logger:
@@ -66,13 +66,15 @@ dotnet test tests/PartnerTransactions.Tests/PartnerTransactions.Tests.csproj \
 | Valid partner response | 1 | Verification returns true because the response contains `isSuccess: true`. |
 | Retry succeeds | 1 | Two transient `408` responses are retried and the third response succeeds. |
 | Retry exhausted | 1 | Four `408` responses return the final failure after the initial call and three retries. |
-| **Total** | **14** | **All current test cases.** |
+| Accepted controller response | 1 | A `202 Accepted` response includes a processing-status message for the caller. |
+| **Total** | **15** | **All current test cases.** |
 
 Theory inputs are counted separately. For example, the invalid-amount theory is one test method but produces three test cases.
 
 ## Test source
 
 - `Validation/TransactionValidatorTests.cs` — request validation rules
+- `Controllers/PartnerIntegrationControllerTests.cs` — accepted response status and message
 - `Clients/PartnerVerificationClientTests.cs` — partner-response deserialization
 - `Clients/RetryStrategyTests.cs` — transient timeout and retry behavior
 - `TestHelpers/SequenceHttpMessageHandler.cs` — deterministic fake HTTP responses

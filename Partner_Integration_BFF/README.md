@@ -109,7 +109,7 @@ Stop the API with `Ctrl+C`.
 
 ## Run the tests
 
-The solution contains a local xUnit test project. Each test display name briefly states the scenario and why the expected result should occur. See the [test README](tests/PartnerTransactions.Tests/README.md) for filters, detailed output, coverage, and all 14 documented cases.
+The solution contains a local xUnit test project. Each test display name briefly states the scenario and why the expected result should occur. See the [test README](tests/PartnerTransactions.Tests/README.md) for filters, detailed output, coverage, and all 15 documented cases.
 
 ```bash
 dotnet test Partner_Integration_BFF.sln \
@@ -144,8 +144,16 @@ curl -i -X POST http://localhost:5180/api/v1/partner/transactions \
 
 The expected response is:
 
-```text
+```http
 HTTP/1.1 202 Accepted
+Content-Type: application/json; charset=utf-8
+
+{
+  "isSuccess": true,
+  "message": "Transaction request accepted for processing.",
+  "statusCode": 202,
+  "data": null
+}
 ```
 
 Open the RabbitMQ management UI and select **Queues and Streams** to inspect `partner-transactions`.
