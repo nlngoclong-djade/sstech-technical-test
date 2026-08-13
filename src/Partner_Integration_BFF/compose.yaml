@@ -1,0 +1,13 @@
+﻿services:
+  partner_integration_bff:
+    image: partner_integration_bff
+    build:
+      context: .
+      dockerfile: Partner_Integration_BFF/Dockerfile
+      
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: partner-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"

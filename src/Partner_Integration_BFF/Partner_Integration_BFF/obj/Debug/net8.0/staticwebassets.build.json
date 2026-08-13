@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "9MBoX96NSL9L/rZhif/B6M8i2QCIcPZYgQuWZC+yOwE=",
+  "Source": "Partner_Integration_BFF",
+  "BasePath": "_content/Partner_Integration_BFF",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}

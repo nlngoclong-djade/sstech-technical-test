@@ -1,0 +1,21 @@
+@Partner_Integration_BFF_HostAddress = http://localhost:5180
+
+GET {{Partner_Integration_BFF_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
+
+# Sends an invalid amount intentionally so the controller can be debugged
+# without requiring the partner verifier or RabbitMQ.
+POST {{Partner_Integration_BFF_HostAddress}}/api/v1/partner/transactions
+Content-Type: application/json
+
+{
+  "partnerId": "P-1001",
+  "transactionReference": "TXN-99823",
+  "amount": 250.00,
+  "currency": "USD",
+  "timestamp": "2024-05-10T14:30:00Z"
+}
+
+###
