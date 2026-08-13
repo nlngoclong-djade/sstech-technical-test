@@ -1,134 +1,73 @@
 # Partner Integration BFF
 
-ASP.NET Core 8 API for accepting partner transactions, verifying the partner, and publishing accepted transactions to RabbitMQ.
+ASP.NET Core 8 API that validates partner transactions, verifies the partner through an HTTP integration, and publishes accepted transactions to RabbitMQ.
 
-## Local architecture
+## Architecture
 
-When running in the `Development` environment:
+```text
+POST /api/v1/partner/transactions
+        |
+        v
+PartnerIntegrationController
+        |
+        v
+PartnerTransactionService
+   |              |
+   v              v
+FluentValidation  VerificationPartner (HTTP + retry/timeout)
+                       |
+                       v
+                RabbitMqMessagePublisher
+                       |
+                       v
+             partner-transactions queue
+```
 
-1. `POST /api/v1/partner/transactions` validates the request.
-2. The API calls its local mock partner endpoint at `/api/mock/partners/{partnerId}`.
-3. A verified transaction is published to the durable RabbitMQ queue `partner-transactions`.
+The main design choices are:
 
-The mock partner endpoint intentionally returns `408 Request Timeout` about 30% of the time so the configured HTTP retry policy can be exercised.
+- The controller is an HTTP adapter only. It delegates orchestration and maps explicit application outcomes to `202`, `400`, or `422` responses.
+- `PartnerTransactionService` owns the validate → verify → publish workflow. Interfaces around partner verification and messaging keep it independently testable.
+- FluentValidation keeps request rules outside the controller and prevents invalid transactions from reaching external dependencies.
+- A typed `HttpClient` uses the standard resilience handler with three exponential-backoff retries and a three-second attempt timeout.
+- RabbitMQ provides the asynchronous boundary. The publisher declares a durable queue, sends persistent messages with mandatory routing, and awaits publisher confirmation before the API returns `202 Accepted`.
+- The mock partner endpoint makes the exercise self-contained and deliberately returns `408 Request Timeout` about 30% of the time to exercise retries.
 
 ## Prerequisites
 
 - [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- One of the following RabbitMQ options:
-  - Docker Desktop with Docker Compose
-  - RabbitMQ installed with Homebrew on macOS
-- JetBrains Rider is optional, but recommended for breakpoint debugging
+- Docker Desktop with Docker Compose, or another RabbitMQ instance
 
-Verify the .NET installation:
+The checked-in `global.json` selects a compatible .NET 8 SDK.
 
-```bash
-dotnet --version
-```
+## Run locally
 
-The repository's `global.json` selects a compatible .NET 8 SDK.
-
-## 1. Start RabbitMQ
-
-Choose either Docker Compose or Homebrew. Do not run both brokers at the same time because they use the same ports.
-
-### Option A: Docker Compose
-
-From the repository root, start only the RabbitMQ service:
+From this directory, start RabbitMQ:
 
 ```bash
 docker compose up -d rabbitmq
 docker compose ps rabbitmq
 ```
 
-The current `compose.yaml` is intended to supply RabbitMQ for local development. Use `docker compose up -d rabbitmq`, rather than starting the entire Compose application, when debugging the API directly in Rider or with `dotnet run`.
-
-To stop it:
-
-```bash
-docker compose stop rabbitmq
-```
-
-### Option B: Homebrew on macOS
-
-Install and start RabbitMQ as a background service:
-
-```bash
-brew install rabbitmq
-brew services start rabbitmq
-```
-
-Check its status:
-
-```bash
-brew services list
-/opt/homebrew/opt/rabbitmq/sbin/rabbitmq-diagnostics -q ping
-```
-
-To stop it:
-
-```bash
-brew services stop rabbitmq
-```
-
-### RabbitMQ endpoints
-
-| Purpose | Address | Credentials |
-| --- | --- | --- |
-| AMQP connection used by the API | `localhost:5672` | `guest` / `guest` |
-| Management UI | <http://localhost:15672> | `guest` / `guest` |
-
-The API declares the `partner-transactions` queue automatically on the first successful publish.
-
-## 2. Restore and build
-
-Run these commands from the repository root:
+Restore, build, and run the API:
 
 ```bash
 dotnet restore Partner_Integration_BFF.sln
 dotnet build Partner_Integration_BFF.sln --no-restore
-```
-
-## 3. Run the API
-
-Use the HTTP development profile:
-
-```bash
 dotnet run \
   --project Partner_Integration_BFF/Partner_Integration_BFF.csproj \
   --launch-profile http
 ```
 
-The API is then available at:
+The local endpoints are:
 
-- Swagger UI: <http://localhost:5180/swagger>
-- Transaction endpoint: `POST http://localhost:5180/api/v1/partner/transactions`
-- Mock partner endpoint: `GET http://localhost:5180/api/mock/partners/{partnerId}`
+- Swagger: <http://localhost:5180/swagger>
+- Transactions: `POST http://localhost:5180/api/v1/partner/transactions`
+- Mock verification: `GET http://localhost:5180/api/mock/partners/{partnerId}`
+- RabbitMQ management: <http://localhost:15672> (`guest` / `guest`)
 
-Stop the API with `Ctrl+C`.
+`compose.yaml` intentionally runs only the local broker; the API runs with `dotnet run` so debugging and configuration remain straightforward.
 
-## Run the tests
-
-The solution contains a local xUnit test project. Each test display name briefly states the scenario and why the expected result should occur. See the [test README](tests/PartnerTransactions.Tests/README.md) for filters, detailed output, coverage, and all 15 documented cases.
-
-```bash
-dotnet test Partner_Integration_BFF.sln \
-  --logger "console;verbosity=normal"
-```
-
-## Debug in Rider
-
-1. Open `Partner_Integration_BFF.sln` in Rider.
-2. Select the `Partner_Integration_BFF: http` run configuration.
-3. Add a breakpoint in `Controllers/PartnerIntegration.cs` or `Services/PartnerTransactionService.cs`.
-4. Click **Debug**.
-5. Submit a request through Swagger or an HTTP client.
-
-Keep RabbitMQ running while stepping through a valid transaction. The broker connection is opened only when the publish step is reached.
-
-## Send a test transaction
-
-With the API and RabbitMQ running:
+## Example request
 
 ```bash
 curl -i -X POST http://localhost:5180/api/v1/partner/transactions \
@@ -136,13 +75,13 @@ curl -i -X POST http://localhost:5180/api/v1/partner/transactions \
   --data '{
     "partnerId": "P-1001",
     "transactionReference": "TXN-99823",
-    "amount": 250,
+    "amount": 250.00,
     "currency": "USD",
     "timestamp": "2026-08-13T14:30:00Z"
   }'
 ```
 
-The expected response is:
+A successful publication returns:
 
 ```http
 HTTP/1.1 202 Accepted
@@ -156,73 +95,55 @@ Content-Type: application/json; charset=utf-8
 }
 ```
 
-Open the RabbitMQ management UI and select **Queues and Streams** to inspect `partner-transactions`.
+The endpoint returns `400 Bad Request` for invalid transaction data and `422 Unprocessable Entity` when the partner response does not verify the requested partner. A valid request requires non-empty IDs, an amount greater than zero, a currency of `USD`, `EUR`, or `VND`, and a non-default timestamp.
 
-Valid requests require:
+## Run the tests
 
-- A non-empty `partnerId`
-- A non-empty `transactionReference`
-- An integer `amount` greater than `0`
-- A `currency` of `USD`, `EUR`, or `VND`
-- A non-empty `timestamp`
+The 24 xUnit cases are isolated from RabbitMQ and do not require the API to be running:
+
+```bash
+dotnet test Partner_Integration_BFF.sln \
+  --logger "console;verbosity=normal"
+```
+
+Generate coverage with:
+
+```bash
+dotnet test tests/PartnerTransactions.Tests/PartnerTransactions.Tests.csproj \
+  --collect:"XPlat Code Coverage"
+```
+
+The test strategy covers:
+
+- validation rules and invalid boundary values;
+- service orchestration, short-circuiting, and publish-once behavior;
+- all controller outcome-to-HTTP mappings and response messages;
+- partner-response deserialization and consistency checks;
+- transient HTTP recovery and retry exhaustion using a deterministic fake handler.
+
+See [tests/PartnerTransactions.Tests/README.md](tests/PartnerTransactions.Tests/README.md) for test filters and the case breakdown.
 
 ## Configuration
 
-The local defaults are:
-
-| Setting | Development value | Purpose |
+| Setting | Development default | Purpose |
 | --- | --- | --- |
 | `RabbitMq:Host` | `localhost` | RabbitMQ host |
-| `PartnerVerification:BaseUrl` | `http://localhost:5180/` | Local mock partner API |
+| `PartnerVerification:BaseUrl` | `http://localhost:5180/` | Partner verification API |
 
-ASP.NET Core configuration values can be overridden with double-underscore environment variable names, for example:
-
-```bash
-RabbitMq__Host=my-rabbit-host dotnet run \
-  --project Partner_Integration_BFF/Partner_Integration_BFF.csproj \
-  --launch-profile http
-```
-
-## Troubleshooting
-
-### `BrokerUnreachableException: None of the specified endpoints were reachable`
-
-Nothing is accepting AMQP connections at the configured host. Confirm RabbitMQ is running and port `5672` is available:
+Override settings with standard ASP.NET Core environment variables, for example:
 
 ```bash
-nc -vz localhost 5672
+RabbitMq__Host=my-rabbit-host \
+PartnerVerification__BaseUrl=https://partner.example/ \
+dotnet run --project Partner_Integration_BFF/Partner_Integration_BFF.csproj
 ```
 
-Then restart the appropriate broker:
+## Trade-offs and production follow-ups
+
+This time-boxed solution favors a small, testable design. For production, the local mock should be replaced or restricted to development, RabbitMQ connections should be reused, and credentials/TLS should be bound through validated options and secret storage. Authentication, rate limiting, idempotency, an outbox, observability, health checks, and integration tests against real dependencies would be the next reliability steps. Publisher confirms and persistent messages improve broker handoff, but they do not by themselves provide exactly-once processing.
+
+Stop local infrastructure with:
 
 ```bash
-docker compose up -d rabbitmq
+docker compose down
 ```
-
-or:
-
-```bash
-brew services restart rabbitmq
-```
-
-### `Connection refused (localhost:5001)`
-
-The development configuration was not loaded. Run with `--launch-profile http`, or ensure `ASPNETCORE_ENVIRONMENT` is set to `Development` and the content root is the project directory.
-
-### `dotnet: command not found`
-
-Install the .NET 8 SDK and make sure the `dotnet` executable is on `PATH`. Confirm with `dotnet --info`.
-
-### Port `5180` is already in use
-
-Find the process using the port:
-
-```bash
-lsof -nP -iTCP:5180 -sTCP:LISTEN
-```
-
-Stop that process or change `applicationUrl` in `Partner_Integration_BFF/Properties/launchSettings.json`.
-
-### Intermittent partner verification timeout
-
-This is expected from the local mock, which randomly returns `408 Request Timeout`. The API retries transient failures. Retry the transaction if all attempts happen to time out.

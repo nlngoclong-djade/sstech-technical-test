@@ -4,7 +4,7 @@ using RabbitMQ.Client;
 
 namespace Partner_Integration_BFF.Messaging;
 
-public class RabbitMqMessagePublisher : IMessagePublisher
+public sealed class RabbitMqMessagePublisher : IMessagePublisher
 {
     private readonly ConnectionFactory _factory;
     private const string QueueName = "partner-transactions";
@@ -24,8 +24,13 @@ public class RabbitMqMessagePublisher : IMessagePublisher
         await using var connection =
             await _factory.CreateConnectionAsync(cancellationToken);
 
-        await using var channel =
-            await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+        var channelOptions = new CreateChannelOptions(
+            publisherConfirmationsEnabled: true,
+            publisherConfirmationTrackingEnabled: true);
+
+        await using var channel = await connection.CreateChannelAsync(
+            channelOptions,
+            cancellationToken);
 
         await channel.QueueDeclareAsync(
             queue: QueueName,
@@ -37,10 +42,18 @@ public class RabbitMqMessagePublisher : IMessagePublisher
 
         var json = JsonSerializer.Serialize(message);
         var body = Encoding.UTF8.GetBytes(json);
+        var properties = new BasicProperties
+        {
+            ContentType = "application/json",
+            MessageId = Guid.NewGuid().ToString("N"),
+            Persistent = true
+        };
 
         await channel.BasicPublishAsync(
             exchange: string.Empty,
             routingKey: QueueName,
+            mandatory: true,
+            basicProperties: properties,
             body: body,
             cancellationToken: cancellationToken);
     }

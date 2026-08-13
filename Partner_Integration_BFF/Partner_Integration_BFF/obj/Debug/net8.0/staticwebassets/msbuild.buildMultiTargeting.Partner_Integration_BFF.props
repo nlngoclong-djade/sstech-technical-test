@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../build/Partner_Integration_BFF.props" />
-</Project>

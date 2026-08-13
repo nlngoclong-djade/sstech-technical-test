@@ -1,9 +1,11 @@
-using Partner_Integration_BFF.Contracts;
+using Partner_Integration_BFF.Contracts.Models;
 using Partner_Integration_BFF.Contracts.Requests;
 
 namespace Partner_Integration_BFF.Services;
 
 public interface IPartnerTransactionService
 {
-    Task<bool> ProcessAsync(PartnerTransactionRequest request, CancellationToken cancellationToken);
+    Task<PartnerTransactionOutcome> ProcessAsync(
+        PartnerTransactionRequest request,
+        CancellationToken cancellationToken);
 }

@@ -1,12 +1,5 @@
 @Partner_Integration_BFF_HostAddress = http://localhost:5180
 
-GET {{Partner_Integration_BFF_HostAddress}}/weatherforecast/
-Accept: application/json
-
-###
-
-# Sends an invalid amount intentionally so the controller can be debugged
-# without requiring the partner verifier or RabbitMQ.
 POST {{Partner_Integration_BFF_HostAddress}}/api/v1/partner/transactions
 Content-Type: application/json
 

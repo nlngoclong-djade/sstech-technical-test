@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="../buildMultiTargeting/Partner_Integration_BFF.props" />
-</Project>

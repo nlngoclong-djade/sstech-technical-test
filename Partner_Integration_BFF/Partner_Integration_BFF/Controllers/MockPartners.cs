@@ -7,14 +7,12 @@ namespace Partner_Integration_BFF.Controllers;
 
 [ApiController]
 [Route("api/mock/partners")]
-public class MockPartnersController() : ControllerBase
+public sealed class MockPartnersController : ControllerBase
 {
-    private readonly Random _random = new();
-   
     [HttpGet("{partnerId}")]
     public IActionResult Get(string partnerId)
     {
-        if (_random.NextDouble() < 0.3)
+        if (Random.Shared.NextDouble() < 0.3)
         {
             return StatusCode(
                 StatusCodes.Status408RequestTimeout,
@@ -22,8 +20,7 @@ public class MockPartnersController() : ControllerBase
                     false,
                     "Partner verification timed out.",
                     HttpStatusCode.RequestTimeout,
-                    new VerifyPartnerResult(partnerId, false)
-                ));
+                    new VerifyPartnerResult(partnerId, false)));
         }
 
         return Ok(new ApiResponse<VerifyPartnerResult>(
@@ -32,8 +29,6 @@ public class MockPartnersController() : ControllerBase
             HttpStatusCode.OK,
             new VerifyPartnerResult(
                 partnerId,
-                true)
-            )
-        );
+                true)));
     }
 }

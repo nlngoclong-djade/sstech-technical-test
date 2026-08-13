@@ -3,7 +3,7 @@ using Partner_Integration_BFF.Contracts.Responses;
 
 namespace Partner_Integration_BFF.Services;
 
-public class VerificationPartner(HttpClient httpClient) : IVerificationPartner
+public sealed class VerificationPartner(HttpClient httpClient) : IVerificationPartner
 {
     private readonly HttpClient _httpClient = httpClient;
 
@@ -11,17 +11,23 @@ public class VerificationPartner(HttpClient httpClient) : IVerificationPartner
         string partnerId,
         CancellationToken cancellationToken)
     {
+        var encodedPartnerId = Uri.EscapeDataString(partnerId);
         var response = await _httpClient.GetAsync(
-            $"api/mock/partners/{partnerId}",
+            $"api/mock/partners/{encodedPartnerId}",
             cancellationToken);
 
         response.EnsureSuccessStatusCode();
 
-        var result =
-            await response.Content.ReadFromJsonAsync<
-                ApiResponse<VerifyPartnerResult>>(
-                cancellationToken);
+        var result = await response.Content.ReadFromJsonAsync<ApiResponse<VerifyPartnerResult>>(
+            cancellationToken);
 
-        return result?.IsSuccess == true;
+        var verifiedPartner = result?.Data;
+
+        return result?.IsSuccess == true &&
+               verifiedPartner?.Valid == true &&
+               string.Equals(
+                   verifiedPartner.PartnerId,
+                   partnerId,
+                   StringComparison.Ordinal);
     }
 }

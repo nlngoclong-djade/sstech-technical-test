@@ -1,0 +1,19 @@
+# .NET build output
+**/bin/
+**/obj/
+**/TestResults/
+
+# IDE and user-specific settings
+.idea/
+**/.idea/
+.vs/
+*.suo
+*.user
+*.DotSettings.user
+
+# OS files
+.DS_Store
+
+# Local configuration and secrets
+.env
+appsettings.Local.json

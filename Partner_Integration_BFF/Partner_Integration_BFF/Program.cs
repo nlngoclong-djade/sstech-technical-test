@@ -15,7 +15,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddSingleton<IValidator<PartnerTransactionRequest>, TransactionValidator>();
 builder.Services.AddSingleton<IMessagePublisher, RabbitMqMessagePublisher>();
-builder.Services.AddSingleton<IPartnerTransactionService, PartnerTransactionService>();
+builder.Services.AddScoped<IPartnerTransactionService, PartnerTransactionService>();
 builder.Services
     .AddHttpClient<IVerificationPartner, VerificationPartner>(client =>
     {

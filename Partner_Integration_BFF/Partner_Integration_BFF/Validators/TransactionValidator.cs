@@ -1,8 +1,7 @@
-using Partner_Integration_BFF.Contracts;
+using FluentValidation;
 using Partner_Integration_BFF.Contracts.Requests;
 
 namespace Partner_Integration_BFF.Validators;
-using FluentValidation;
 
 public sealed class TransactionValidator : AbstractValidator<PartnerTransactionRequest>
 {
